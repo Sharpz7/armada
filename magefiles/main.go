@@ -167,9 +167,6 @@ func LocalDev(arg string) error {
 	mg.Deps(BootstrapTools)
 	fmt.Println("Time to bootstrap tools:", time.Since(timeTaken))
 
-	// Set the Executor Update Frequency to 1 second for local development
-	os.Setenv("ARMADA_SCHEDULING_EXECUTORUPDATEFREQUENCY", "1s")
-
 	switch arg {
 	case "minimal":
 		timeTaken := time.Now()
@@ -185,6 +182,27 @@ func LocalDev(arg string) error {
 	default:
 		return fmt.Errorf("invalid argument: %s Please enter one the following argument: minimal, minimal-pulsar, full, no-build, debug ", arg)
 	}
+
+	// print the docker images
+	fmt.Println("Docker images:")
+	// Get output of docker images list
+	output, err := sh.Output("docker", "image", "list")
+	if err != nil {
+		return err
+	}
+	fmt.Println(output)
+
+	// Purge the go cache
+	if err := sh.Run("go", "clean", "-cache"); err != nil {
+		return err
+	}
+
+	// Check the storage on the host
+	output, err = sh.Output("df", "-h")
+	if err != nil {
+		return err
+	}
+	fmt.Println(output)
 
 	mg.Deps(StartDependencies)
 	fmt.Println("Waiting for dependencies to start...")

@@ -10,7 +10,7 @@ permissions:
 jobs:
   ts-unit-tests:
     name: TypeScript Unit Tests
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -48,16 +48,28 @@ jobs:
 
   go-unit-tests:
     name: Golang Unit Tests
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3.3.0
 
-      - name: Setup Golang with Cache
-        uses: magnetikonline/action-golang-cache@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: ${{ matrix.go }}
+          cache: false
+
+      # Check for cache
+      - name: Cache Go modules
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golang-
 
       - name: Setup dependencies
         shell: bash
@@ -87,7 +99,7 @@ jobs:
 
   go-integration-tests:
     name: Golang Integration Tests
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
 
     env:
       ARMADA_EXECUTOR_INGRESS_URL: "http://localhost"
@@ -108,21 +120,28 @@ jobs:
       - name: Install Docker Buildx
         run: docker buildx install
 
-      - name: Setup Golang with Cache
-        uses: magnetikonline/action-golang-cache@v4
-        with:
-          go-version: "1.20"
+      - name: Free some disk space
+        run: docker image prune -af
 
-      - name: Setup dependencies
-        shell: bash
-        run: go run github.com/magefile/mage@v1.14.0 -v download
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+
+      # Check for cache
+      - name: Cache Go modules
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golang-
 
       - name: Setup and Run Integration Tests
-        run: |
-          # Manually create folders to ensure perms are correct.
-          mkdir -p .kube/internal
-          mkdir -p .kube/external
-          go run github.com/magefile/mage@v1.14.0 -v localdev minimal testsuite
+        run: go run github.com/magefile/mage@v1.14.0 -v localdev minimal testsuite
 
       - name: Upload JUnit Report Artifact
         uses: actions/upload-artifact@v3
@@ -131,7 +150,7 @@ jobs:
           path: junit.xml
           if-no-files-found: error
 
-      - name: Store Docker Logs
+      - name: Store Docker Compose Logs
         if: always()
         run: |
           mkdir -p ./logs
@@ -157,21 +176,39 @@ jobs:
           detailed_summary: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Only save on master branch
+      - uses: actions/cache/save@v3
+        if: github.ref == 'refs/heads/master'
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+
   go-mod-up-to-date:
     name: Golang Mod Up To Date
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.3.0
 
-      - name: Setup Golang with Cache
-        uses: magnetikonline/action-golang-cache@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: ${{ matrix.go }}
+          cache: false
 
-      - name: Download all Go modules
-        run: go mod download
+      # Check for cache
+      - name: Cache Go modules
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go
+          key: ${{ runner.os }}-golang-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golang-
 
       - name: Check for tidyness of go.mod and go.sum
         run: |
@@ -196,9 +233,10 @@ jobs:
 
           exit $changed
 
+
   proto-up-to-date:
     name: Proto Up To Date
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -214,6 +252,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
+          cache: false
 
       - name: Setup dependencies
         shell: bash
