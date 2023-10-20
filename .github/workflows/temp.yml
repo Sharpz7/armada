@@ -55,12 +55,12 @@ jobs:
           path: |
             /home/runner/.cache/go-build
             /home/runner/go/pkg/mod
-          key: ${{ runner.os }}-temp-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-templocaldev-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-temp-
+            ${{ runner.os }}-templocaldev-
 
       - name: Run Our Bootstrap Test
-        run: go run github.com/magefile/mage@v1.14.0 -v bootstraptools
+        run: go run github.com/magefile/mage@v1.14.0 -v mage localdev minimal testsuite
 
       # Only save on master branch
       - uses: actions/cache/save@v3
@@ -68,4 +68,4 @@ jobs:
           path: |
             /home/runner/.cache/go-build
             /home/runner/go/pkg/mod
-          key: ${{ runner.os }}-temp-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-templocaldev-${{ hashFiles('**/go.sum') }}
