@@ -1,0 +1,72 @@
+name: Tests
+
+on:
+  push:
+    tags:
+      - v*
+    branches-ignore:
+      - gh-pages
+  pull_request:
+    branches-ignore:
+      - gh-pages
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  go-temp:
+    name: Golang Bootstrap Test
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+
+    env:
+      ARMADA_EXECUTOR_INGRESS_URL: "http://localhost"
+      ARMADA_EXECUTOR_INGRESS_PORT: 5001
+      # Cache Docker layers in the GitHub actions cache.
+      # These variables are picked up by the goreleaser config.
+      DOCKER_BUILDX_CACHE_FROM: "type=gha"
+      DOCKER_BUILDX_CACHE_TO: "type=gha,mode=max"
+      DOCKER_BUILDX_BUILDER: "builder"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.3.0
+
+      - name: Create Docker Buildx Builder
+        run: docker buildx create --name ${DOCKER_BUILDX_BUILDER} --driver docker-container --use
+
+      - name: Install Docker Buildx
+        run: docker buildx install
+
+      - name: Free some disk space
+        run: docker image prune -af
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.20"
+          cache: false
+
+      # Check for cache
+      - name: Cache Go modules
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go/pkg/mod
+          key: ${{ runner.os }}-temp-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-temp-
+
+      - name: Run Our Bootstrap Test
+        run: go run github.com/magefile/mage@v1.14.0 -v bootstraptools
+
+      # Only save on master branch
+      - uses: actions/cache/save@v3
+        if: github.ref == 'refs/heads/master'
+        with:
+          path: |
+            /home/runner/.cache/go-build
+            /home/runner/go/pkg/mod
+          key: ${{ runner.os }}-temp-${{ hashFiles('**/go.sum') }}
